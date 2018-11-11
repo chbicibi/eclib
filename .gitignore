@@ -1,0 +1,10 @@
+*.exe
+*.o
+*.mod
+*.smod
+*.csv
+*.plt
+*.png
+__*__/
+config/
+result/
