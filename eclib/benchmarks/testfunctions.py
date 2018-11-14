@@ -67,8 +67,8 @@ def zdt4(x):
     if len(x) == 1:
         return x[0], 1 - math.sqrt(x[0])
 
-    g = 1 + 10 * (len(x) - 1) + sum(map(lambda v: v ** 2 - 10 * math.cos(PI4 * v),
-                                                                            x[1:]))
+    g = 1 + 10 * (len(x) - 1) \
+        + sum(map(lambda v: v ** 2 - 10 * math.cos(PI4 * v), x[1:]))
     return x[0], g * (1 - math.sqrt(x[0] / g))
 
 

@@ -2,7 +2,7 @@ import random
 import numpy as np
 
 
-class PolynomialBounded():
+class PolynomialMutation():
     def __init__(self, rate=0.1, eta=20):
         self.rate = rate
         self.eta = eta
@@ -10,12 +10,12 @@ class PolynomialBounded():
     def __call__(self, gene):
         size = len(gene)
         res = np.array(gene)
-        xl, xu = 0, 1
+        xl, xu = 0.0, 1.0
 
         for i, x in enumerate(gene):
             if random.random() > self.rate:
                 continue
-            x = gene[i]
+            # x = gene[i]
             delta_1 = (x - xl) / (xu - xl)
             delta_2 = (xu - x) / (xu - xl)
             rand = random.random()

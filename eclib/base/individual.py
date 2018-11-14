@@ -1,13 +1,13 @@
 from functools import total_ordering
-# import numpy as np
+import numpy as np
 from .collections import Container
 
 
-class Genome(list):
+class Genome(np.ndarray):
     ''' GA遺伝子を格納するデータ構造
     '''
-    def __init__(self):
-        pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(self, *args, **kwargs)
 
 
 class Individual(Container):
@@ -16,6 +16,7 @@ class Individual(Container):
     '''
     current_id = 0
     pool = []
+    bounds = None # None or (low, up) or ([low], [up])
 
     def __init__(self, genome, origin=None):
         super().__init__()
@@ -98,7 +99,14 @@ class Individual(Container):
 
     def decode(self, x):
         ''' genotype -> phenotype '''
-        return x
+        if self.bounds is None:
+            return x
+        # convert [0, 1] -> [low, up]
+        try:
+            low, up = self.bounds
+            return np.array([(u - l) * x_ + l for x_, l, u in zip(x, low, up)])
+        except TypeError:
+            return np.array([(up - low) * x_ + low for x_ in x])
 
 
 @total_ordering
@@ -133,9 +141,7 @@ class Fitness(Container):
         1. の場合はTrue, それ以外はFalseを返す
         '''
         return self.data <= other.data and self.data != other.data
-
-    # def initialize(self, initializer):
-    #     self.gene = initializer()
+        # return self.data < other.data
 
     def set_fitness(self, fitness, rank):
         self.value = fitness

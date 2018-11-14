@@ -15,16 +15,17 @@ from operator import attrgetter
 import numpy as np
 import matplotlib.pyplot as plt
 
-from eclib.benchmarks import zdt1, rosenbrock
-from eclib.nsga2 import NSGA2
+from eclib.benchmarks import rosenbrock, zdt1, zdt2, zdt3, zdt4, zdt6
 from eclib.operations import UniformInitializer
 from eclib.operations import RouletteSelection
 from eclib.operations import TournamentSelection
 from eclib.operations import TournamentSelectionStrict
 from eclib.operations import TournamentSelectionDCD
-from eclib.operations import BLXCrossover
-from eclib.operations import SimulatedBinaryBounded
-from eclib.operations import PolynomialBounded
+from eclib.operations import BlendCrossover
+from eclib.operations import SimulatedBinaryCrossover
+from eclib.operations import PolynomialMutation
+from eclib.optimizers import NSGA2
+from eclib.base import Individual
 
 import myutils as ut
 
@@ -57,7 +58,7 @@ def identity(x):
 
 
 def clip(x):
-    return np.clip(x, 0, 1)
+    return np.clip(x, 0.0, 1.0)
 
 
 ################################################################################
@@ -69,22 +70,28 @@ def ga_main(out='result', clear_directory=False):
     # パラメータ
     n_dim = 30
     pop_size = 100
-    epoch = 500
+    epoch = 250
     # save_trigger = lambda i: i == 1 or i % 10 == 0 # 10 epochごと
     save_trigger = lambda i: i == epoch              # 最後だけ
 
     # 問題
-    problem = zdt1
+    problem = zdt3
     initializer = UniformInitializer(n_dim)
-    selection = TournamentSelection(ksize=2)
+    # selection = TournamentSelection(ksize=2)
+    selection = TournamentSelectionStrict(ksize=2)
     # selection = TournamentSelectionDCD()
-    # crossover = BLXCrossover(alpha=0.5)
-    crossover = SimulatedBinaryBounded(rate=0.9, eta=20)
-    mutation = PolynomialBounded(rate=1/n_dim, eta=20)
+    # crossover = BlendCrossover(alpha=0.5)
+    crossover = SimulatedBinaryCrossover(rate=0.9, eta=20)
+    mutation = PolynomialMutation(rate=1/n_dim, eta=20)
 
     optimizer = NSGA2(pop_size, selection, crossover, mutation)
     # optimizer.set_initializer(Initializer(3))
     optimizer.setup(problem)
+
+    ### Additional setting ###
+    optimizer.n_cycle = pop_size // 2
+    # optimizer.alternation = 'replace'
+    ##########################
 
     with ut.stopwatch('main'):
         # GA開始
@@ -93,9 +100,8 @@ def ga_main(out='result', clear_directory=False):
 
         # 進化
         for i in range(1, epoch + 1):
-            # optimizer.advance()
             optimizer.advance()
-            print('epoch:', i, end='\r')
+            print('epoch:', i, 'popsize:', len(optimizer.population), end='\r')
             if save_trigger(i):
                 optimizer.save(file=os.path.join(out, f'epoch{i}.pickle'))
 
@@ -109,11 +115,156 @@ def ga_main(out='result', clear_directory=False):
     # first_population = optimizer[0]
 
     last_population = optimizer.get_individuals()
+    optimal_front = get_optomal_front()
+
+    ### TEMP: check stat ###
+    print("Convergence: ", convergence(last_population, optimal_front))
+    print("Diversity: ", diversity(last_population, optimal_front[0], optimal_front[-1]))
+    ########################
+
+    ### TEMP: plot front ###
     x, y = np.array([x.value for x in last_population]).T
-    plt.scatter(x, y)
+
+    plt.scatter(optimal_front[:, 0], optimal_front[:, 1], c='r')
+
+    plt.scatter(x, y, c='b')
+    plt.axis("tight")
     # plt.xlim((0, 1))
     # plt.ylim((0, 1))
     plt.show()
+    ########################
+
+
+class NSGA_ENV(object):
+    def __init__(self, problem, epoch):
+        # パラメータ
+        n_dim = 30
+        pop_size = 100
+        # epoch = 250
+        # save_trigger = lambda i: i == 1 or i % 10 == 0 # 10 epochごと
+        # save_trigger = lambda i: i == epoch              # 最後だけ
+
+        if problem == zdt4 or problem == zdt6:
+            n_dim = 10
+        if problem == zdt4:
+            Individual.bounds = ([0.0] + [-5.0] * (n_dim - 1),
+                                 [1.0] + [5.0] * (n_dim - 1))
+
+        # 問題
+        # problem = zdt4
+        initializer = UniformInitializer(n_dim)
+        # selection = TournamentSelection(ksize=2)
+        selection = TournamentSelectionStrict(ksize=2)
+        # selection = TournamentSelectionDCD()
+        # crossover = BlendCrossover(alpha=0.5)
+        crossover = SimulatedBinaryCrossover(rate=0.9, eta=20)
+        mutation = PolynomialMutation(rate=1/n_dim, eta=20)
+
+        optimizer = NSGA2(pop_size, selection, crossover, mutation)
+        # optimizer.set_initializer(Initializer(3))
+        optimizer.setup(problem)
+
+        ### Additional setting ###
+        optimizer.initializer = initializer
+        optimizer.n_cycle = pop_size // 2
+        # optimizer.alternation = 'replace'
+        ##########################
+
+        self.optimizer = optimizer
+
+    def __enter__(self):
+        return self.optimizer
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.optimizer.clear()
+
+
+def ga_main01(out='result', clear_directory=False):
+    ''' GAテスト & プロット
+    '''
+    if clear_directory and os.path.isdir(out):
+        shutil.rmtree(out)
+
+    problem = zdt1
+    epoch = 20
+    save_trigger = lambda i: i == epoch # 最後だけ
+
+    with NSGA_ENV(problem=problem, epoch=epoch) as optimizer:
+        with ut.stopwatch('main'):
+            # GA開始
+            # 初期集団生成
+            optimizer.create_initial_population()
+
+            # 進化
+            for i in range(1, epoch + 1):
+                optimizer.advance()
+                print('epoch:', i, 'popsize:', len(optimizer.population), end='\r')
+                if save_trigger(i):
+                    optimizer.save(file=os.path.join(out, f'epoch{i}.pickle'))
+
+
+        # elite = optimizer.get_elite()
+        # history = optimizer.history
+        # def best(pop):
+        #     return [x for x in pop if x.rank == 1][0]()
+        # bests = np.array([best(pop) for pop in history])
+
+        # first_population = optimizer[0]
+
+        last_population = optimizer.get_individuals()
+        last_population.sort(key=lambda x: x.value)
+        optimal_front = get_optomal_front('pareto_front/zdt1_front.json')
+
+        ### TEMP: check stat ###
+        print("Convergence: ", convergence(last_population, optimal_front))
+        print("Diversity: ", diversity(last_population, optimal_front[0], optimal_front[-1]))
+        ########################
+
+        ### TEMP: plot front ###
+        x, y = np.array([x.value for x in last_population]).T
+
+        plt.scatter(optimal_front[:, 0], optimal_front[:, 1], c='r')
+
+        plt.scatter(x, y, c='b')
+        plt.axis("tight")
+        # plt.xlim((0, 1))
+        # plt.ylim((0, 1))
+        plt.show()
+        ########################
+
+
+def ga_main02(out='result', clear_directory=False):
+    ''' GAテスト & プロット
+    '''
+    if clear_directory and os.path.isdir(out):
+        shutil.rmtree(out)
+
+    epoch = 250
+    save_trigger = lambda i: i == epoch # 最後だけ
+    optimal_front = get_optomal_front()
+    stat = []
+
+    with NSGA_ENV(epoch) as optimizer:
+        for rep in range(100):
+            with ut.stopwatch(f'epoch{epoch+1}'):
+                optimizer.create_initial_population()
+                for i in range(1, epoch + 1):
+                    optimizer.advance()
+                    print('epoch:', i, 'popsize:', len(optimizer.population), end='\r')
+
+            last_population = optimizer.get_individuals()
+            last_population.sort(key=lambda x: x.value)
+
+            conv = convergence(last_population, optimal_front)
+            div = diversity(last_population, optimal_front[0], optimal_front[-1])
+            stat.append((conv, div))
+
+            print("Convergence: ", conv)
+            print("Diversity: ", div)
+
+    print('=' * 20, 'Average', '=' * 20)
+    print("Convergence: ", np.mean([x[0] for x in stat]))
+    print("Diversity: ",  np.mean([x[1] for x in stat]))
 
 
 def ga_main1(out='result'):
@@ -179,6 +330,56 @@ def ga_main2(out='result'):
 
 
 ################################################################################
+### TEMP ###
+################################################################################
+
+def get_optomal_front(file):
+    import json
+    with open(file, 'r') as optimal_front_data:
+        optimal_front = json.load(optimal_front_data)
+    # Use 500 of the 1000 points in the json file
+    optimal_front = sorted(optimal_front[i]
+                           for i in range(0, len(optimal_front), 2))
+    return np.array(optimal_front)
+
+
+def diversity(first_front, first, last):
+    from math import hypot
+    df = hypot(first_front[0][0] - first[0],
+               first_front[0][1] - first[1])
+    dl = hypot(first_front[-1][0] - last[0],
+               first_front[-1][1] - last[1])
+    dt = [hypot(f[0] - s[0],
+                f[1] - s[1])
+          for f, s in zip(first_front[:-1], first_front[1:])]
+
+    if len(first_front) == 1:
+        return df + dl
+
+    dm = sum(dt)/len(dt)
+    di = sum(abs(d_i - dm) for d_i in dt)
+    delta = (df + dl + di)/(df + dl + len(dt) * dm )
+    return delta
+
+
+def convergence(first_front, optimal_front):
+    from math import sqrt
+    distances = []
+
+    for ind in first_front:
+        distances.append(float("inf"))
+        for opt_ind in optimal_front:
+            dist = 0.
+            for i in range(len(opt_ind)):
+                dist += (ind[i] - opt_ind[i])**2
+            if dist < distances[-1]:
+                distances[-1] = dist
+        distances[-1] = sqrt(distances[-1])
+
+    return sum(distances) / len(distances)
+
+
+################################################################################
 
 def __test__():
     from scipy.interpolate import RegularGridInterpolator
@@ -218,10 +419,19 @@ def __test__():
     # plt.show()
 
 
-# def __test__():
-#     a = list(range(5))
-#     print(a.pop(3))
-#     print(a)
+class TestClass(object):
+    def __new__(cls, *args):
+        print('new', args)
+        return super().__new__(cls)
+
+    def __init__(self, *args):
+        print('init', args)
+
+def __test__():
+    a = TestClass(0)
+    print(a)
+    print(type(list))
+    assert False, 'Error'
 
 
 def get_args():
@@ -261,6 +471,10 @@ def main():
 
     if args.method == '0':
         ga_main(out=out, clear_directory=clear)
+    elif args.method == '01':
+        ga_main01(out=out, clear_directory=clear)
+    elif args.method == '02':
+        ga_main02(out=out, clear_directory=clear)
     elif args.method == '1':
         ga_main1()
     elif args.method == '2':

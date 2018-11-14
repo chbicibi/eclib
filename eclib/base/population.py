@@ -9,8 +9,12 @@ class Population(Collection):
 
     def __init__(self, data=None, capacity=None):
         super().__init__()
-        self.data = data or []
-        self.capacity = capacity
+        if isinstance(data, Population):
+            self.data = data.data
+            self.capacity = capacity or data.capacity
+        else:
+            self.data = data or []
+            self.capacity = capacity
 
     def __add__(self, other):
         return self.data + other.data

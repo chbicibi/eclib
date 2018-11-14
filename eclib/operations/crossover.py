@@ -2,7 +2,7 @@ import random
 import numpy as np
 
 
-class BLXCrossover(object):
+class BlendCrossover(object):
     def __init__(self, rate=0.9, alpha=0.5, oneout=False):
         self.rate = rate
         self.alpha = alpha
@@ -26,7 +26,7 @@ class BLXCrossover(object):
             return y1, y2
 
 
-class SimulatedBinaryBounded(object):
+class SimulatedBinaryCrossover(object):
     def __init__(self, rate=0.9, eta=20, oneout=False):
         self.rate = rate
         self.eta = eta
@@ -43,7 +43,7 @@ class SimulatedBinaryBounded(object):
 
         size = min(len(y1), len(y2))
 
-        xl, xu = 0, 1
+        xl, xu = 0.0, 1.0
         eta = self.eta
 
         for i in range(size):

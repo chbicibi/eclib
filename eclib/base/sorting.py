@@ -17,60 +17,61 @@ class NondominatedSort(object):
     def __init__(self, size=100):
         self.size = size
 
-        self.is_dominated = np.empty((size, size), dtype=np.uint8)
-        self.num_dominated = np.empty(size, dtype=np.uint32)
-        self.mask = np.empty(size, dtype=np.uint8)
-        self.rank = np.empty(size, dtype=np.uint32)
+        # self.is_dominated = np.empty((size, size), dtype=np.bool)
+        # self.num_dominated = np.empty(size, dtype=np.uint32)
+        # self.mask = np.empty(size, dtype=np.bool)
+        # self.rank = np.empty(size, dtype=np.uint32)
 
-    def __call__(self, population):
+    def __call__(self, population, n=None):
+        # return sortNondominated_v1(population, n=n)
+
         popsize = len(population)
         if not popsize:
             Exception('Error: population size is 0')
 
-        if popsize != self.size:
-            self.size = popsize
-            self.is_dominated = np.empty((popsize, popsize), dtype=np.uint32)
-            self.num_dominated = np.empty(popsize, dtype=np.uint32)
-            self.mask = np.empty(popsize, dtype=np.uint32)
-            # self.rank = np.zeros(popsize, dtype=np.uint32)
-        self.rank = np.zeros(popsize, dtype=np.uint32)
+        is_dominated = np.empty((popsize, popsize), dtype=np.bool)
+        num_dominated = np.empty(popsize, dtype=np.int64)
+        mask = np.empty(popsize, dtype=np.bool)
+        rank = np.zeros(popsize, dtype=np.int64)
 
         for i in range(popsize):
             for j in range(popsize):
                 # iはjに優越されているか
-                if i != j and population[j].dominates(population[i]):
-                    self.is_dominated[i, j] = 1
-                else:
-                    self.is_dominated[i, j] = 0
+                isdom = i != j and population[j].dominates(population[i])
+                is_dominated[i, j] = isdom
 
         # iを優越している個体を数える
-        self.is_dominated.sum(axis=(1,), out=self.num_dominated)
+        is_dominated.sum(axis=(1,), out=num_dominated)
 
         fronts = []
+        lim = popsize if n is None else n
         for r in range(popsize):
             # ランク未決定かつ最前線であるかを判定
             front = []
             for i in range(popsize):
-                if self.rank[i] or self.num_dominated[i]:
-                    # ランク決定済み又は優越個体がある
-                    self.mask[i] = 0
-                else:
-                    self.mask[i] = 1
-
-                if self.mask[i]:
-                    self.rank[i] = r + 1
+                # ランク未決定又は優越される個体がない->ランク決定
+                isrankdetermined = not (rank[i] or num_dominated[i])
+                mask[i] = isrankdetermined
+                if isrankdetermined:
+                    rank[i] = r + 1
                     front.append(population[i])
 
             fronts.append(front)
+            lim -= len(front)
 
             # 終了判定
-            if self.rank.all():
+            # if rank.all():
+            if lim <= 0:
                 return fronts
-                # return self.rank
+                # return rank
 
             # 優越数更新
-            for i in range(popsize):
-                self.num_dominated[i] -= (self.mask * self.is_dominated[i, :]).sum()
+            # for i in range(popsize):
+            #     num_dominated[i] -= np.sum(mask * is_dominated[i, :])
+            # print(mask.dtype)
+            # print(is_dominated.dtype)
+            # print((mask & is_dominated).sum(axis=(1,)))
+            num_dominated -= np.sum(mask & is_dominated, axis=(1,))
 
         raise Exception('Error: reached the end of function')
 
@@ -110,3 +111,61 @@ class CrowdingDistanceCalculator(object):
                 distances[c] += (get_value(r) - get_value(l)) / norm
 
         return distances
+
+################################################################################
+
+from collections import defaultdict
+
+
+def sortNondominated_v1(population, n=None, first_front_only=False):
+    k = len(population) if n is None else n
+    if k == 0:
+        return []
+
+    map_fit_ind = defaultdict(list)
+    for fit in population:
+        map_fit_ind[fit.data.value].append(fit)
+    fits = list(map_fit_ind.keys())
+
+    current_front = []
+    next_front = []
+    dominating_fits = defaultdict(int)
+    dominated_fits = defaultdict(list)
+
+    def dominates(fit0, fit1):
+        return map_fit_ind[fit0][0].dominates(map_fit_ind[fit1][0])
+
+    # Rank first Pareto front
+    for i, fit_i in enumerate(fits):
+        for fit_j in fits[i+1:]:
+            if dominates(fit_i, fit_j):
+                dominating_fits[fit_j] += 1
+                dominated_fits[fit_i].append(fit_j)
+            elif dominates(fit_j, fit_i):
+                dominating_fits[fit_i] += 1
+                dominated_fits[fit_j].append(fit_i)
+        if dominating_fits[fit_i] == 0:
+            current_front.append(fit_i)
+
+    fronts = [[]]
+    for fit in current_front:
+        fronts[-1].extend(map_fit_ind[fit])
+    pareto_sorted = len(fronts[-1])
+
+    # Rank the next front until all population are sorted or
+    # the given number of individual are sorted.
+    if not first_front_only:
+        N = min(len(population), k)
+        while pareto_sorted < N:
+            fronts.append([])
+            for fit_p in current_front:
+                for fit_d in dominated_fits[fit_p]:
+                    dominating_fits[fit_d] -= 1
+                    if dominating_fits[fit_d] == 0:
+                        next_front.append(fit_d)
+                        pareto_sorted += len(map_fit_ind[fit_d])
+                        fronts[-1].extend(map_fit_ind[fit_d])
+            current_front = next_front
+            next_front = []
+
+    return fronts
