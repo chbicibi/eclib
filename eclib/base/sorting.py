@@ -22,7 +22,7 @@ class NondominatedSort(object):
         # self.mask = np.empty(size, dtype=np.bool)
         # self.rank = np.empty(size, dtype=np.uint32)
 
-    def __call__(self, population, n=None):
+    def __call__(self, population, n=None, return_rank=False):
         # return sortNondominated_v1(population, n=n)
 
         popsize = len(population)
@@ -60,10 +60,11 @@ class NondominatedSort(object):
             lim -= len(front)
 
             # 終了判定
-            # if rank.all():
-            if lim <= 0:
+            if return_rank:
+                if rank.all():
+                    return rank
+            elif lim <= 0:
                 return fronts
-                # return rank
 
             # 優越数更新
             # for i in range(popsize):

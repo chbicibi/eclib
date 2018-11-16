@@ -115,7 +115,7 @@ def ga_main(out='result', clear_directory=False):
     # first_population = optimizer[0]
 
     last_population = optimizer.get_individuals()
-    optimal_front = get_optomal_front()
+    optimal_front = get_optomal_front('pareto_front/zdt1_front.json')
 
     ### TEMP: check stat ###
     print("Convergence: ", convergence(last_population, optimal_front))
@@ -147,8 +147,10 @@ class NSGA_ENV(object):
         if problem == zdt4 or problem == zdt6:
             n_dim = 10
         if problem == zdt4:
-            Individual.bounds = ([0.0] + [-5.0] * (n_dim - 1),
-                                 [1.0] + [5.0] * (n_dim - 1))
+            Individual.set_bounds([0.0] + [-5.0] * (n_dim - 1),
+                                  [1.0] + [5.0] * (n_dim - 1))
+        # Individual.set_bounds([0], [1])
+        # Individual.set_weight([1, 1])
 
         # 問題
         # problem = zdt4
@@ -186,7 +188,7 @@ def ga_main01(out='result', clear_directory=False):
         shutil.rmtree(out)
 
     problem = zdt1
-    epoch = 20
+    epoch = 200
     save_trigger = lambda i: i == epoch # 最後だけ
 
     with NSGA_ENV(problem=problem, epoch=epoch) as optimizer:
@@ -428,10 +430,7 @@ class TestClass(object):
         print('init', args)
 
 def __test__():
-    a = TestClass(0)
-    print(a)
-    print(type(list))
-    assert False, 'Error'
+    print(np.array(np.array((0,))))
 
 
 def get_args():

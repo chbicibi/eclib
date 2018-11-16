@@ -98,12 +98,12 @@ class NSGA2(object):
             # print('#1.1')
             parents = [next(parents_it) for _ in range(self.n_parents)]
             # print('#1.2')
-            genomes = self.mate([fit.data for fit in parents]) # Indivに変換
+            genomes = self.mate([fit.get_indiv() for fit in parents]) # Indivに変換
             # print('#1.3')
             for genome in genomes:
                 gen = self.mutate(genome)
                 # print('#1.4')
-                gen = np.clip(gen, 0.0, 1.0)
+                # gen = np.clip(gen, 0.0, 1.0) # clipはmateとmutateでそれぞれ行う
                 # parents -> self.mate -> self.mutate
 
                 origin = parents, self.mate, self.mutate
@@ -214,6 +214,15 @@ class NSGA2(object):
             print(k)
             exit()
         return chosen
+
+    def calc_rank(self, population, n=None):
+        ''' 各個体の集団内におけるランクを計算して設定する
+        '''
+        rank = self.sort_fn(population, return_rank=True)
+        for fit, r in zip(population, rank):
+            fit.rank = r
+        return population
+
     # def get_parents(self, population, n):
     #     '''
     #     inputs:
@@ -231,7 +240,7 @@ class NSGA2(object):
     #     return selected
 
     def get_individuals(self):
-        return [fit.data for fit in self.population]
+        return [fit.get_indiv() for fit in self.population]
 
     def get_elite(self):
         return [x for x in self.population if x.rank == 1]
@@ -247,7 +256,8 @@ class NSGA2(object):
         with open(file, 'wb') as f:
             pickle.dump(self, f)
 
-    def load(file):
+    @classmethod
+    def load(cls, file):
         try:
             with open(file, 'rb') as f:
                 return pickle.load(f)

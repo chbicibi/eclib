@@ -17,12 +17,14 @@ class Individual(Container):
     current_id = 0
     pool = []
     bounds = None # None or (low, up) or ([low], [up])
+    weight = None # 重み(正=>最小化, 負=>最大化)
 
     def __init__(self, genome, origin=None):
         super().__init__()
         self.genome = genome # 遺伝子型
         self.origin = origin # 派生元 (初期化関数又は関数と引数の組)
         self.value = None    # 評価値 (デフォルトではシーケンス型)
+        self.wvalue = None   # 重み付き評価値
 
         # self.id = Individual.current_id
         # Individual.current_id += 1
@@ -39,42 +41,46 @@ class Individual(Container):
         if not isinstance(other, Individual):
             # return NotImplemented
             raise TypeError
-        return all(s == o for s, o in zip(self.value, other.value))
+        return all(s == o for s, o in zip(self.wvalue, other.wvalue))
 
     def __ne__(self, other):
         if not isinstance(other, Individual):
             # return NotImplemented
             raise TypeError
-        return any(s != o for s, o in zip(self.value, other.value))
+        return any(s != o for s, o in zip(self.wvalue, other.wvalue))
 
     def __lt__(self, other):
         if not isinstance(other, Individual):
             # return NotImplemented
             raise TypeError
-        return all(s < o for s, o in zip(self.value, other.value))
+        return all(s < o for s, o in zip(self.wvalue, other.wvalue))
 
     def __le__(self, other):
         if not isinstance(other, Individual):
             # return NotImplemented
             raise TypeError
-        return all(s <= o for s, o in zip(self.value, other.value))
+        return all(s <= o for s, o in zip(self.wvalue, other.wvalue))
 
     def __gt__(self, other):
         if not isinstance(other, Individual):
             # return NotImplemented
             raise TypeError
-        return all(s > o for s, o in zip(self.value, other.value))
+        return all(s > o for s, o in zip(self.wvalue, other.wvalue))
 
     def __ge__(self, other):
         if not isinstance(other, Individual):
             # return NotImplemented
             raise TypeError
-        return all(s >= o for s, o in zip(self.value, other.value))
+        return all(s >= o for s, o in zip(self.wvalue, other.wvalue))
 
     def evaluate(self, function):
         if not self.evaluated():
             self.function = function
             self.value = function(self.get_variable())
+            if self.weight is not None:
+                self.wvalue = self.weight * self.value
+            else:
+                self.wvalue = self.value
         return Fitness(self)
 
     def get_variable(self):
@@ -102,11 +108,21 @@ class Individual(Container):
         if self.bounds is None:
             return x
         # convert [0, 1] -> [low, up]
-        try:
-            low, up = self.bounds
-            return np.array([(u - l) * x_ + l for x_, l, u in zip(x, low, up)])
-        except TypeError:
-            return np.array([(up - low) * x_ + low for x_ in x])
+        # try:
+        low, up = self.bounds
+            # return np.array([(u - l) * x_ + l for x_, l, u in zip(x, low, up)])
+        return (up - low) * x + low
+        # except TypeError:
+        #     return np.array([(up - low) * x_ + low for x_ in x])
+
+    @classmethod
+    def set_bounds(cls, low, up):
+        cls.bounds = np.array(low), np.array(up)
+
+    @classmethod
+    def set_weight(cls, weight):
+        cls.weight = np.array(weight)
+
 
 
 @total_ordering
@@ -146,6 +162,9 @@ class Fitness(Container):
     def set_fitness(self, fitness, rank):
         self.value = fitness
         self.rank = rank
+
+    def get_indiv(self):
+        return self.data
 
     # def get_gene(self):
     #     ''' getter of genotype '''
