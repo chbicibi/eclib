@@ -1,6 +1,15 @@
+import ctypes
+import os
 import random
 import numpy as np
 
+
+LOADER_PATH = os.path.abspath(os.path.join(__file__, '../../../lib'))
+
+
+################################################################################
+# double
+################################################################################
 
 class BlendCrossover(object):
     def __init__(self, rate=0.9, alpha=0.5, oneout=False):
@@ -86,3 +95,42 @@ class SimulatedBinaryCrossover(object):
             return y1
         else:
             return y1, y2
+
+
+################################################################################
+# int
+################################################################################
+
+class OrderCrossover(object):
+    def __init__(self, rate=0.9):
+        libname = 'libec.dll'
+        loader_path = LOADER_PATH
+        cdll = np.ctypeslib.load_library(libname, loader_path)
+
+        func_ptr = getattr(cdll, 'order_crossover')
+        func_ptr.argtypes = [
+            np.ctypeslib.ndpointer(dtype=np.int32),
+            np.ctypeslib.ndpointer(dtype=np.int32),
+            ctypes.c_int32,
+            np.ctypeslib.ndpointer(dtype=np.int32),
+            np.ctypeslib.ndpointer(dtype=np.int32),
+        ]
+        func_ptr.restype = ctypes.c_void_p
+
+        def f_(x1, x2):
+            n1 = ctypes.c_int32(x1.size)
+            y1, y2 = (np.empty_like(x) for x in (x1, x2))
+            func_ptr(x1, x2, n1, y1, y2)
+            return y1, y2
+
+        self.rate = rate
+        self.f_ = f_
+
+    def __call__(self, origin):
+        x1, x2 = (x.get_gene() for x in origin[:2])
+        if random.random() > self.rate:
+            return x1, x2
+        return self.f_(x1, x2)
+
+    def __reduce_ex__(self, protocol):
+        return type(self), (self.rate,)

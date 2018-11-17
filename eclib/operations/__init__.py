@@ -5,4 +5,6 @@ from .selection import TournamentSelectionStrict
 from .selection import TournamentSelectionDCD
 from .crossover import BlendCrossover
 from .crossover import SimulatedBinaryCrossover
+from .crossover import OrderCrossover
 from .mutation import PolynomialMutation
+from .mutation import SwapMutation

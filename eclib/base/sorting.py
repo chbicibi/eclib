@@ -77,6 +77,61 @@ class NondominatedSort(object):
         raise Exception('Error: reached the end of function')
 
 
+class NondominatedSortIterator(object):
+    '''
+    def cmp(a, b):
+        if a == b: return 0
+        return -1 if a < b else 1
+    '''
+    def __init__(self, population):
+        self._population = population
+        self._size = len(population)
+
+        if not self._size:
+            Exception('Error: population is empty')
+
+    def __iter__(self):
+        pop = self._population
+        lim = self._size
+
+        is_dominated = np.empty((self._size, self._size), dtype=np.bool)
+        num_dominated = np.empty(self._size, dtype=np.int64)
+        mask = np.empty(self._size, dtype=np.bool)
+        rank = np.zeros(self._size, dtype=np.int64)
+
+        for i in range(self._size):
+            for j in range(self._size):
+                # iはjに優越されているか
+                is_dominated[i, j] = i != j and pop[j].dominates(pop[i])
+
+        # iを優越している個体を数える
+        is_dominated.sum(axis=(1,), out=num_dominated)
+
+        for r in range(self._size):
+            # ランク未決定かつ最前線であるかを判定
+            front = []
+            for i in range(self._size):
+                # ランク未決定又は優越される個体がない->ランク決定
+                isrankdetermined = not (rank[i] or num_dominated[i])
+                mask[i] = isrankdetermined
+                if isrankdetermined:
+                    rank[i] = r + 1
+                    front.append(pop[i])
+                    lim -= 1
+            yield front
+
+            # 終了判定
+            if lim <= 0:
+                raise StopIteration()
+
+            # 優越数更新
+            num_dominated -= np.sum(mask & is_dominated, axis=(1,))
+
+        raise Exception('Error: reached the end of function')
+
+
+################################################################################
+
 class CrowdingDistanceCalculator(object):
     def __init__(self, key=identity):
         self.key = key
@@ -112,6 +167,7 @@ class CrowdingDistanceCalculator(object):
                 distances[c] += (get_value(r) - get_value(l)) / norm
 
         return distances
+
 
 ################################################################################
 

@@ -1,7 +1,13 @@
 from functools import total_ordering
 import numpy as np
-from .collections import Container
+# from .collections import Container
 
+
+class IndividualNotEvaluated(Exception):
+    pass
+
+
+################################################################################
 
 class Genome(np.ndarray):
     ''' GA遺伝子を格納するデータ構造
@@ -10,7 +16,7 @@ class Genome(np.ndarray):
         super().__init__(self, *args, **kwargs)
 
 
-class Individual(Container):
+class Individual(object):
     ''' 進化計算個体
     遺伝子と評価値を管理する
     '''
@@ -20,7 +26,6 @@ class Individual(Container):
     weight = None # 重み(正=>最小化, 負=>最大化)
 
     def __init__(self, genome, origin=None):
-        super().__init__()
         self.genome = genome # 遺伝子型
         self.origin = origin # 派生元 (初期化関数又は関数と引数の組)
         self.value = None    # 評価値 (デフォルトではシーケンス型)
@@ -31,6 +36,14 @@ class Individual(Container):
         self.id = len(Individual.pool)
         Individual.current_id = self.id + 1
         Individual.pool.append(self)
+
+    def __getitem__(self, key):
+        if self.value is None:
+            raise IndividualNotEvaluated()
+        return self.value[key]
+
+    def __len__(self):
+        return len(self.value)
 
     def __str__(self):
         return f'indiv{self.id}'
@@ -126,13 +139,19 @@ class Individual(Container):
 
 
 @total_ordering
-class Fitness(Container):
+class Fitness(object):
     ''' 適応度
     '''
     def __init__(self, individual):
         super().__init__()
         self.data = individual # GA個体
         self.value = None      # 適応度 (デフォルトではシーケンス型, 先頭から優先的に参照される)
+
+    def __getitem__(self, key):
+        return self.data[key]
+
+    def __len__(self):
+        return len(self.data)
 
     def __str__(self):
         return f'fitness{self.data.id}'
@@ -186,3 +205,8 @@ class Fitness(Container):
     #     if not self.value:
     #         self.problem = problem
     #         self.value = np.array(problem(self.get_variable()))
+
+class Couple(object):
+    def __init__(self, data):
+        self._data = data
+        self._offspring = []

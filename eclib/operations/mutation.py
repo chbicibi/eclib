@@ -35,18 +35,27 @@ class PolynomialMutation():
             res[i] = y
         return res
 
-# const pmu = (a=20) => {
-#   let _eta = a;
-#   const fn = gene => {
-#     const dst = [];
-#     for (let i = 0, l = gene.length; i < l; ++i) {
-#       const r = Math.random();
-#       dst.push(clamp(gene[i] + (r <= 0.5 ?
-#         ((2 * r) **       (1 / (1 + _eta)) - 1) * gene[i] :
-#         ((2 * (1 - r)) ** (1 / (1 + _eta)) - 1) * (gene[i] - 1)), 0, 1));
-#     }
-#     return dst;
-#   }
-#   fn.eta = function(a) { _eta = a; return this; }
-#   return fn;
-# }
+
+class SwapMutation():
+    def __init__(self, rate=0.1):
+        self.rate = rate
+
+    def __call__(self, gene):
+        if random.random() > self.rate:
+            return gene
+
+        index = np.random.choice(range(len(gene)), size=2, replace=False)
+        res = np.array(gene)
+        res[index] = res[index[::-1]]
+        return res
+
+
+def __test__():
+    a = np.arange(10)
+    mu = SwapMutation(1.0)
+    print(a)
+    print(mu(a))
+
+
+if __name__ == '__main__':
+    __test__()

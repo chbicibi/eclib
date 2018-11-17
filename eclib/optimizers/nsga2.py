@@ -21,19 +21,109 @@ import argparse
 import os
 import pickle
 import shutil
-from itertools import chain
+from itertools import islice
 from operator import attrgetter, itemgetter
 
 import numpy as np
 
 from ..base import Individual
 from ..base import Population
-from ..base import NondominatedSort
+from ..base import NondominatedSortIterator
 from ..base import CrowdingDistanceCalculator
 
 
 def clip(x):
     return np.clip(x, 0.0, 1.0)
+
+
+################################################################################
+
+class PartialSelectionIterator(object):
+    ''' SelectionIteratorの部分適用オブジェクト
+    '''
+    def __init__(self, selection):
+        self._selection = selection
+
+    def __call__(self, population, reset_cycle=None):
+        return SelectionIterator(self._selection, population, reset_cycle)
+
+
+class SelectionIterator(object):
+    ''' 交配の親選択イテレータ
+    個体集団から親個体を選択し，選択された親個体を解集団から削除する(削除方式はselection関数に依存)
+    reset_cycleが与えられた場合は解をreset_cycle個生成するごとに解集団をpopulationで初期化する
+    '''
+    def __new__(cls, selection, population=None, reset_cycle=None):
+        if population is None:
+            return PartialSelectionIterator(selection)
+        return super().__new__(cls)
+
+    def __init__(self, selection, population, reset_cycle=None):
+        self._selection = selection
+        self._population = population
+        self._reset_cycle = reset_cycle
+        self._stored = []
+
+    def __iter__(self):
+        rest = []
+        couner = 0
+        while True:
+            if not rest or (self._reset_cycle and couner == self._reset_cycle):
+                rest = list(self._population)
+                couner = 0
+            selected, rest = self._selection(rest)
+            couner += 1
+            self._stored.append(selected)
+            yield selected
+
+    def __getnewargs__(self):
+        return self._selection, self._population, self._reset_cycle
+
+
+class PartialMatingIterator(object):
+    ''' MatingIteratorの部分適用オブジェクト
+    '''
+    def __init__(self, crossover, mutation, indiv_type):
+        self._crossover = crossover
+        self._mutation = mutation
+        self._indiv_type = indiv_type
+
+    def __call__(self, origin):
+        return MatingIterator(self._crossover, self._mutation, self._indiv_type,
+                              origin)
+
+
+class MatingIterator(object):
+    ''' 親の組からこの組を生成するイテレータ
+    crossoverとmutationの直列方式
+    '''
+    def __new__(cls, crossover, mutation, indiv_type, origin=None):
+        if origin is None:
+            return PartialMatingIterator(crossover, mutation, indiv_type)
+            # return lambda x: cls(crossover, mutation, indiv_type, x)
+        return super().__new__(cls)
+
+    def __init__(self, crossover, mutation, indiv_type, origin):
+        self._crossover = crossover
+        self._mutation = mutation
+        self._indiv_type = indiv_type
+        self._origin = origin
+
+        self._parents = [fit.get_indiv() for fit in origin] # Indivに変換
+        self._stored = []
+
+    def __iter__(self):
+        genomes = self._crossover(self._parents) # 子個体の遺伝子の組
+
+        for genome in genomes:
+            # 1個体の遺伝子
+            genome = self._mutation(genome)
+            child = self._indiv_type(genome, origin=self)
+            self._stored.append(child)
+            yield child
+
+    def __getnewargs__(self):
+        return self._crossover, self._mutation, self._indiv_type, self._origin
 
 
 ################################################################################
@@ -44,9 +134,9 @@ class NSGA2(object):
     def __init__(self, popsize, selection, crossover, mutation,
                  indiv_type=Individual):
         self.popsize = popsize
-        self.select = selection
-        self.mate = crossover
-        self.mutate = mutation
+        # self.select = selection
+        # self.mate = crossover
+        # self.mutate = mutation
 
         self.n_parents = 2        # 1回の交叉の親個体の数
         self.n_cycle = 2          # 選択候補をリセットする周期(n_parentsの倍数にすること)
@@ -59,8 +149,14 @@ class NSGA2(object):
         self.population = Population(capacity=popsize)
         # self.next_population = Population(capacity=popsize)
 
-        self.sort_fn = NondominatedSort(popsize)
+        self.select_it = SelectionIterator(selection=selection)
+        self.mate_it = MatingIterator(crossover=crossover,
+                                      mutation=mutation,
+                                      indiv_type=indiv_type)
+        self.sort_it = NondominatedSortIterator
         self.share_fn = CrowdingDistanceCalculator(key=attrgetter('data')) # Fitness -> Individual
+
+        self.generation = 0
         self.history = []
 
     def __getitem__(self, key):
@@ -73,8 +169,11 @@ class NSGA2(object):
         ''' 最適化問題を登録 '''
         self.problem = problem
 
-    def create_initial_population(self, initializer=None):
-        ''' 初期集団生成 '''
+    def init_population(self, initializer=None):
+        ''' 初期集団生成
+        '''
+        self.generation = 1
+
         if initializer:
             self.initializer = initializer
         if not self.initializer:
@@ -89,48 +188,23 @@ class NSGA2(object):
         self.history.append(self.population)
 
     def advance(self):
-        ''' 選択→交叉→突然変異→評価→適応度計算→世代交代 '''
+        ''' 選択→交叉→突然変異→評価→適応度計算→世代交代
+        '''
+        self.generation += 1
 
         next_population = Population(capacity=self.popsize)
-        parents_it = self.parents_it(self.population, cycle=self.n_cycle)
+        select_it = self.select_it(self.population, reset_cycle=self.n_cycle)
 
         while not next_population.filled():
-            # print('#1.1')
-            parents = [next(parents_it) for _ in range(self.n_parents)]
-            # print('#1.2')
-            genomes = self.mate([fit.get_indiv() for fit in parents]) # Indivに変換
-            # print('#1.3')
-            for genome in genomes:
-                gen = self.mutate(genome)
-                # print('#1.4')
-                # gen = np.clip(gen, 0.0, 1.0) # clipはmateとmutateでそれぞれ行う
-                # parents -> self.mate -> self.mutate
+            parents_it = list(islice(select_it, self.n_parents))
 
-                origin = parents, self.mate, self.mutate
-                offspring = self.indiv_type(gen, origin=origin)
-
-                # print('#1.5')
-                fitness = offspring.evaluate(self.problem)
-                next_population.append(fitness)
+            for child in self.mate_it(parents_it):
+                child_fit = child.evaluate(self.problem)
+                next_population.append(child_fit)
 
         self.population = self.alternate(next_population)
         self.history.append(self.population)
-
-    def parents_it(self, population, cycle=None):
-        '''
-        inputs:
-            population: sequence of Fitness
-            cycle: period of reset
-        '''
-        rest = []
-        i = 0
-        while True:
-            if not rest or (cycle and i == cycle):
-                rest = list(population)
-                i = 0
-            parent, rest = self.select(rest)
-            i += 1
-            yield parent
+        return self.population
 
     def alternate(self, next_population):
         ''' 適応度計算 → 世代交代
@@ -144,102 +218,58 @@ class NSGA2(object):
         elif self.alternation == 'join':
             joined = self.population + next_population
             next_population = self.calc_fitness(joined, n=self.popsize)
+            print([fit.rank for fit in next_population])
+            # exit()
             return Population(next_population, capacity=self.popsize)
 
         else:
             print('Unexpected alternation type:', self.alternation)
             raise Exception('UnexpectedAlternation')
 
-    def calc_fitness_0(self, population, n=None):
-        ''' 各個体の集団内における適応度を計算する
-        1. 比優越ソート
-        2. 混雑度計算
-        '''
-        fronts = self.sort_fn(population, n=n)
-        lim = len(population) if n is None else n
-        selected = []
-        for i, front in enumerate(fronts):
-            rank = i + 1
-            fit = 0.8 ** i # TODO: 可変にする
-            if self.share_fn:
-                crowdings = self.share_fn(front)
-            else:
-                crowdings = None
-            for j, indiv in enumerate(front):
-                if crowdings is not None:
-                    crowding = crowdings[j]
-                    fitness = fit, crowding
-                else:
-                    fitness = fit,
-                indiv.set_fitness(fitness, rank)
-            lim -= len(front)
-            if lim < 0:
-                selected.extend(sorted(front, key=itemgetter(1),
-                                       reverse=True)[:lim])
-                break
-            else:
-                selected.extend(front)
-                if lim == 0:
-                    break
-        return selected
-
     def calc_fitness(self, population, n=None):
         ''' 各個体の集団内における適応度を計算する
         1. 比優越ソート
         2. 混雑度計算
         '''
-        fronts = self.sort_fn(population, n=n)
         lim = len(population) if n is None else n
-        for i, front in enumerate(fronts):
+        selected = []
+
+        for i, front in enumerate(self.sort_it(population)):
+            # print('g:', self.generation, 'i:', i, 'l:', len(front))
             rank = i + 1
-            fit = 0.8 ** i # TODO: 可変にする
+            fit_value = 0.8 ** i # TODO: 可変にする
+
             if self.share_fn:
-                crowdings = self.share_fn(front)
+                for fit, crowding in zip(front, self.share_fn(front)):
+                    fitness = fit_value, crowding
+                    fit.set_fitness(fitness, rank)
             else:
-                crowdings = None
-            for j, indiv in enumerate(front):
-                if crowdings is not None:
-                    crowding = crowdings[j]
-                    fitness = fit, crowding
-                else:
-                    fitness = fit,
-                indiv.set_fitness(fitness, rank)
+                for fit in front:
+                    fitness = fit_value,
+                    fit.set_fitness(fitness, rank)
 
-        chosen = list(chain(*fronts[:-1]))
-        k = lim - len(chosen)
-        if k > 0:
-            sorted_front = sorted(fronts[-1], key=itemgetter(1), reverse=True)
-            chosen.extend(sorted_front[:k])
-        elif k < 0:
-            print(k)
-            exit()
-        return chosen
+            lim -= len(front) # 個体追加後の余裕
+            if lim >= 0:
+                selected.extend(front)
+                if lim == 0:
+                    return selected
+            else:
+                front.sort(key=itemgetter(1), reverse=True) # 混雑度降順で並べ替え
+                selected.extend(front[:lim])
+                return selected
 
-    def calc_rank(self, population, n=None):
-        ''' 各個体の集団内におけるランクを計算して設定する
-        '''
-        rank = self.sort_fn(population, return_rank=True)
-        for fit, r in zip(population, rank):
-            fit.rank = r
-        return population
-
-    # def get_parents(self, population, n):
+    # def calc_rank(self, population, n=None):
+    #     ''' 各個体の集団内におけるランクを計算して設定する
     #     '''
-    #     inputs:
-    #         population: sequence of Fitness
-    #     result:
-    #         selected: sequence of Fitness
-    #     '''
-    #     rest = list(population)
-    #     selected = []
-    #     for i in range(n):
-    #         parent, rest = self.select(rest)
-    #         if not parent:
-    #             return selected
-    #         selected.append(parent)
-    #     return selected
+    #     for i, fronts in enumerate(self.sort_it(population)):
+    #         rank = i + 1
+    #         for fit in fronts:
+    #             fit.rank = rank
+    #     return population
 
     def get_individuals(self):
+        ''' 現在の解集団(Fitness)から個体集団(Individual)を取得
+        '''
         return [fit.get_indiv() for fit in self.population]
 
     def get_elite(self):
