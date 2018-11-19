@@ -1,7 +1,7 @@
-from .collections import Collection
+# from .collections import Collection
 
 
-class Population(Collection):
+class Population(object):
     ''' 解集団
     GAの個体を管理する (デフォルトではシーケンス型)
     島モデルの場合はmigrationを担当する
@@ -15,6 +15,12 @@ class Population(Collection):
         else:
             self.data = data or []
             self.capacity = capacity
+
+    def __getitem__(self, key):
+        return self.data[key]
+
+    def __len__(self):
+        return len(self.data)
 
     def __add__(self, other):
         return self.data + other.data

@@ -44,7 +44,7 @@ class SwapMutation():
         if random.random() > self.rate:
             return gene
 
-        index = np.random.choice(range(len(gene)), size=2, replace=False)
+        index = random.sample(range(len(gene)), 2)
         res = np.array(gene)
         res[index] = res[index[::-1]]
         return res

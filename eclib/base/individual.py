@@ -20,7 +20,7 @@ class Individual(object):
     ''' 進化計算個体
     遺伝子と評価値を管理する
     '''
-    current_id = 0
+    # current_id = 0
     pool = []
     bounds = None # None or (low, up) or ([low], [up])
     weight = None # 重み(正=>最小化, 負=>最大化)
@@ -33,9 +33,9 @@ class Individual(object):
 
         # self.id = Individual.current_id
         # Individual.current_id += 1
-        self.id = len(Individual.pool)
-        Individual.current_id = self.id + 1
-        Individual.pool.append(self)
+        self.id = len(type(self).pool)
+        # type(self).current_id = self.id + 1
+        type(self).pool.append(self)
 
     def __getitem__(self, key):
         if self.value is None:
@@ -136,6 +136,10 @@ class Individual(object):
     def set_weight(cls, weight):
         cls.weight = np.array(weight)
 
+    @classmethod
+    def clear(cls):
+        cls.pool = []
+
 
 
 @total_ordering
@@ -148,10 +152,10 @@ class Fitness(object):
         self.value = None      # 適応度 (デフォルトではシーケンス型, 先頭から優先的に参照される)
 
     def __getitem__(self, key):
-        return self.data[key]
+        return self.value[key]
 
     def __len__(self):
-        return len(self.data)
+        return len(self.value)
 
     def __str__(self):
         return f'fitness{self.data.id}'

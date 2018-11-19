@@ -10,6 +10,19 @@ def identity(x):
     return x
 
 
+class RandomSelection(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, population):
+        s = len(population)
+        if s == 0:
+            return None, []
+        pop = list(population)
+        index = random.randrange(s)
+        return pop.pop(index), pop
+
+
 class RouletteSelection(object):
     def __init__(self, key=itemgetter(0)):
         # default key: fitst item of touple
@@ -35,7 +48,10 @@ class TournamentSelection(object):
 
     def __call__(self, population):
         s = len(population)
-        k = min(self.ksize, s)
+        # k = min(self.ksize, s)
+        k = self.ksize
+        if s < k:
+            return None, []
         pop = list(population)
         indices = random.sample(range(s), k)
 
@@ -51,15 +67,21 @@ class TournamentSelectionStrict(object):
 
     def __call__(self, population):
         s = len(population)
-        if s <= 1:
+        # k = min(self.ksize, s)
+        k = self.ksize
+        if s < k:
             return None, []
-        k = min(self.ksize, s)
-        pop = list(population)
-        indices = random.sample(range(s), k)
+        pop, rest = self.separate_random(population, k)
+        return max(pop), rest
 
-        # pop = random.sample(population, k)
-        index = max(indices, key=pop.__getitem__)
-        return pop[index], [x for i, x in enumerate(pop) if i not in indices]
+    def separate_random(self, pop, k):
+        selected = []
+        rest = list(pop)
+        size = len(pop)
+        for i in range(k):
+            index = random.randrange(size - i)
+            selected.append(rest.pop(index))
+        return selected, rest
 
 
 class TournamentSelectionDCD(object):
@@ -69,38 +91,50 @@ class TournamentSelectionDCD(object):
 
     def __call__(self, population):
         s = len(population)
-        if s <= 1:
-            return None, []
         # k = min(self.ksize, s)
         k = 2
-        pop = list(population)
-        indices = random.sample(range(s), k)
+        if s < k:
+            return None, []
+        pop, rest = self.separate_random(population, k)
+
+        # pop = list(population)
+        # indices = random.sample(range(s), k)
 
         # pop = random.sample(population, k)
 
-        def ret(i):
-            # return pop.pop(indices[i]), pop
-            return getpop(i), [x for i, x in enumerate(pop) if i not in indices]
-        def getpop(i):
-            return pop[indices[i]]
+        # def ret(i):
+        #     # return pop.pop(indices[i]), pop
+        #     return getpop(i), [x for i, x in enumerate(pop) if i not in indices]
+        # def getpop(i):
+        #     return pop[indices[i]]
 
-        if getpop(0).dominates(getpop(1)):
+        # 優越関係比較
+        if pop[0].dominates(pop[1]):
             # self.pat[0] += 1
-            return ret(0)
-        elif getpop(1).dominates(getpop(0)):
+            return pop[0], rest
+        elif pop[1].dominates(pop[0]):
             # self.pat[1] += 1
-            return ret(1)
+            return pop[1], rest
 
-        if len(getpop(0)) >= 2 and len(getpop(1)) >= 2:
+        if len(pop[0]) >= 2 and len(pop[1]) >= 2:
             # 混雑度比較
-            if getpop(0)[1] < getpop(1)[1]:
+            if pop[0][1] < pop[1][1]:
                 # self.pat[2] += 1
-                return ret(1)
-            elif getpop(0)[1] > getpop(1)[1]:
+                return pop[1], rest
+            elif pop[0][1] > pop[1][1]:
                 # self.pat[3] += 1
-                return ret(0)
+                return pop[0], rest
         # self.pat[4] += 1
 
         if random.random() <= 0.5:
-            return ret(0)
-        return ret(1)
+            return pop[0], rest
+        return pop[1], rest
+
+    def separate_random(self, pop, k):
+        selected = []
+        rest = list(pop)
+        size = len(pop)
+        for i in range(k):
+            index = random.randrange(size - i)
+            selected.append(rest.pop(index))
+        return selected, rest

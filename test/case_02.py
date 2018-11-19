@@ -14,16 +14,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from eclib.benchmarks import rosenbrock, zdt1, zdt2, zdt3, zdt4, zdt6
-from eclib.operations import UniformInitializer
-from eclib.operations import RouletteSelection
-from eclib.operations import TournamentSelection
-from eclib.operations import TournamentSelectionStrict
-from eclib.operations import TournamentSelectionDCD
-from eclib.operations import BlendCrossover
-from eclib.operations import SimulatedBinaryCrossover
-from eclib.operations import PolynomialMutation
-from eclib.optimizers import NSGA2
-from eclib.base import Individual
+# from eclib.operations import UniformInitializer
+# from eclib.operations import RouletteSelection
+# from eclib.operations import TournamentSelection
+# from eclib.operations import TournamentSelectionStrict
+# from eclib.operations import TournamentSelectionDCD
+# from eclib.operations import BlendCrossover
+# from eclib.operations import SimulatedBinaryCrossover
+# from eclib.operations import PolynomialMutation
+from eclib.optimizers import MOEAD
+# from eclib.base import Individual
 
 import base_01 as base
 import myutils as ut
@@ -37,11 +37,11 @@ def ga_main01(out='result', clear_directory=False):
     if clear_directory and os.path.isdir(out):
         shutil.rmtree(out)
 
-    problem = zdt1
+    problem = zdt6
     epoch = 250
     save_trigger = lambda i: i == epoch # 最後だけ
 
-    with base.NSGA2_ENV(problem) as optimizer:
+    with base.MOEAD_ENV(problem) as optimizer:
         with ut.stopwatch('main'):
             # GA開始
             # 初期集団生成
@@ -66,7 +66,9 @@ def ga_main01(out='result', clear_directory=False):
 
         last_population = optimizer.get_individuals()
         last_population.sort(key=lambda x: x.value)
-        optimal_front = base.get_optomal_front('pareto_front/zdt1_front.json')
+        optimal_front = base.get_optomal_front(f'pareto_front/{problem.__name__}_front.json')
+
+        print(len(set([ind.id for ind in last_population])))
 
         ### TEMP: check stat ###
         print("Convergence: ", base.convergence(last_population, optimal_front))
@@ -101,7 +103,7 @@ def ga_main02(out='result', clear_directory=False):
     stat = []
 
     for rep in range(50):
-        with base.NSGA2_ENV(problem) as optimizer:
+        with base.MOEAD_ENV(problem) as optimizer:
             with ut.stopwatch(f'epoch{epoch+1}'):
                 optimizer.init_population()
                 for i in range(1, epoch + 1):
@@ -128,7 +130,7 @@ def ga_main02(out='result', clear_directory=False):
 
 def ga_main1(out='result'):
     file = ut.fsort(glob.glob(os.path.join(out, f'epoch*.pickle')))[-1]
-    optimizer = NSGA2.load(file=file)
+    optimizer = MOEAD.load(file=file)
 
     elite = optimizer.get_elite()
     print('elite:', len(elite))
@@ -137,17 +139,24 @@ def ga_main1(out='result'):
         print(epoch, end='\n')
         plt.cla()
 
-        print([fit.rank for fit in population])
-        exit()
+        # print([fit.rank for fit in population])
+        # exit()
 
-        for i in range(1):
-            front = [x for x in population if x.rank == i]
-            if not front:
-                continue
-            x, y = np.array([x.data.value for x in front]).T
-            plt.scatter(x, y, label=f'{front[0][0]:.3f}')
+        # for i in range(1):
+        #     front = [x for x in population if x.rank == i]
+        #     if not front:
+        #         continue
+        #     x, y = np.array([x.data.value for x in front]).T
+        #     plt.scatter(x, y, label=f'{front[0][0]:.3f}')
+        front = population
+        x, y = np.array([x.data.value for x in front]).T
+        plt.scatter(x, y, label=f'{front[0][0]:.3f}')
 
-        plt.legend()
+        # plt.legend()
+        if epoch >= 10:
+            plt.show()
+            return
+
         if epoch < len(optimizer) - 1:
             plt.pause(0.2)
         else:
@@ -156,7 +165,7 @@ def ga_main1(out='result'):
 
 def ga_main2(out='result'):
     file = ut.fsort(glob.glob(os.path.join(out, f'epoch*.pickle')))[-1]
-    optimizer = NSGA2.load(file=file)
+    optimizer = MOEAD.load(file=file)
 
     population = optimizer[-1]
     front = [x for x in population if x.rank == 1]
@@ -264,9 +273,7 @@ class TestIterator(object):
 
 
 def __test__():
-    a = [(1, 10), (0, 1), (0, 2), (1, -1), (1, 2)]
-    print(sorted(a))
-    print((1, 10) < (0, 1000))
+    print(np.min([[0, 15], (5, 10)], axis=0))
 
 
 def get_args():

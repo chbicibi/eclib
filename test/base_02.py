@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 
 from eclib.benchmarks import rosenbrock, zdt1, zdt2, zdt3, zdt4, zdt6
 from eclib.operations import UniformInitializer
-from eclib.operations import RandomSelection
 from eclib.operations import RouletteSelection
 from eclib.operations import TournamentSelection
 from eclib.operations import TournamentSelectionStrict
@@ -26,7 +25,6 @@ from eclib.operations import BlendCrossover
 from eclib.operations import SimulatedBinaryCrossover
 from eclib.operations import PolynomialMutation
 from eclib.optimizers import NSGA2
-from eclib.optimizers import MOEAD
 from eclib.base import Individual
 
 import myutils as ut
@@ -44,7 +42,7 @@ def clip(x):
 
 ################################################################################
 
-class NSGA2_ENV(object):
+class NSGA_ENV(object):
     def __init__(self, problem):
         # パラメータ
         n_dim = 30
@@ -72,55 +70,6 @@ class NSGA2_ENV(object):
         mutation = PolynomialMutation(rate=1/n_dim, eta=20)
 
         optimizer = NSGA2(pop_size, selection, crossover, mutation)
-        # optimizer.set_initializer(Initializer(3))
-        optimizer.setup(problem)
-
-        ### Additional setting ###
-        optimizer.initializer = initializer
-        optimizer.n_cycle = None
-        # optimizer.alternation = 'replace'
-        ##########################
-
-        self.optimizer = optimizer
-
-    def __enter__(self):
-        return self.optimizer
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.optimizer.clear()
-
-
-class MOEAD_ENV(object):
-    def __init__(self, problem):
-        # パラメータ
-        n_dim = 30
-        pop_size = 100
-        ksize = 5 # MOEA/D近傍サイズ
-
-        # epoch = 250
-        # save_trigger = lambda i: i == 1 or i % 10 == 0 # 10 epochごと
-        # save_trigger = lambda i: i == epoch              # 最後だけ
-
-        if problem == zdt4 or problem == zdt6:
-            n_dim = 10
-        if problem == zdt4:
-            Individual.set_bounds([0.0] + [-5.0] * (n_dim - 1),
-                                  [1.0] + [5.0] * (n_dim - 1))
-        # Individual.set_bounds([0], [1])
-        # Individual.set_weight([1, 1])
-
-        # 問題
-        # problem = zdt4
-        initializer = UniformInitializer(n_dim)
-        selection = RandomSelection()
-        # selection = TournamentSelection(ksize=2)
-        # selection = TournamentSelectionStrict(ksize=2)
-        # selection = TournamentSelectionDCD()
-        # crossover = BlendCrossover(alpha=0.5)
-        crossover = SimulatedBinaryCrossover(rate=0.9, eta=20)
-        mutation = PolynomialMutation(rate=1/n_dim, eta=20)
-
-        optimizer = MOEAD(pop_size, selection, crossover, mutation, ksize)
         # optimizer.set_initializer(Initializer(3))
         optimizer.setup(problem)
 

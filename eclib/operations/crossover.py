@@ -18,8 +18,9 @@ class BlendCrossover(object):
         self.oneout = oneout
 
     def __call__(self, origin):
-        x1 = origin[0].get_gene()
-        x2 = origin[1].get_gene()
+        # x1 = origin[0].get_gene()
+        # x2 = origin[1].get_gene()
+        x1, x2 = (x.get_gene('d') for x in origin[:2])
 
         if random.random() > self.rate:
             return x1, x2
@@ -45,7 +46,7 @@ class SimulatedBinaryCrossover(object):
         # x1 = origin[0].get_gene()
         # x2 = origin[1].get_gene()
 
-        y1, y2 = (np.array(x.get_gene()) for x in origin[:2])
+        y1, y2 = (np.array(x.get_gene('d')) for x in origin[:2])
 
         if random.random() > self.rate:
             return y1, y2
@@ -118,16 +119,20 @@ class OrderCrossover(object):
         func_ptr.restype = ctypes.c_void_p
 
         def f_(x1, x2):
-            n1 = ctypes.c_int32(x1.size)
-            y1, y2 = (np.empty_like(x) for x in (x1, x2))
-            func_ptr(x1, x2, n1, y1, y2)
-            return y1, y2
+            try:
+                n1 = ctypes.c_int32(x1.size)
+                y1, y2 = (np.empty_like(x) for x in (x1, x2))
+                func_ptr(x1, x2, n1, y1, y2)
+                return y1, y2
+            except:
+                print(x1, x2)
+                raise
 
         self.rate = rate
         self.f_ = f_
 
     def __call__(self, origin):
-        x1, x2 = (x.get_gene() for x in origin[:2])
+        x1, x2 = (x.get_gene('i') for x in origin[:2])
         if random.random() > self.rate:
             return x1, x2
         return self.f_(x1, x2)

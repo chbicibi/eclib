@@ -153,8 +153,8 @@ class CrowdingDistanceCalculator(object):
 
             index.sort(key=get_value)
 
-            distances[index[0]] = float('Infinity')
-            distances[index[-1]] = float('Infinity')
+            distances[index[0]] = float('inf')
+            distances[index[-1]] = float('inf')
 
             vrange = get_value(-1) - get_value(0)
 
