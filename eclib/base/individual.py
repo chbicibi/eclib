@@ -1,3 +1,4 @@
+# import random
 from functools import total_ordering
 import numpy as np
 # from .collections import Container
@@ -21,7 +22,7 @@ class Individual(object):
     遺伝子と評価値を管理する
     '''
     # current_id = 0
-    pool = []
+    # pool = []
     bounds = None # None or (low, up) or ([low], [up])
     weight = None # 重み(正=>最小化, 負=>最大化)
 
@@ -33,9 +34,9 @@ class Individual(object):
 
         # self.id = Individual.current_id
         # Individual.current_id += 1
-        self.id = len(type(self).pool)
+        # self.id = len(type(self).pool)
         # type(self).current_id = self.id + 1
-        type(self).pool.append(self)
+        # type(self).pool.append(self)
 
     def __getitem__(self, key):
         if self.value is None:
@@ -103,7 +104,7 @@ class Individual(object):
     def evaluated(self):
         return self.value is not None
 
-    def get_gene(self, **kwargs):
+    def get_gene(self, *args, **kwargs):
         ''' getter of genotype
         [memo]
             gene: a part of genome (single type), 遺伝子
@@ -141,15 +142,16 @@ class Individual(object):
         cls.pool = []
 
 
-
 @total_ordering
 class Fitness(object):
     ''' 適応度
     '''
+    # current_id = 0
     def __init__(self, individual):
-        super().__init__()
         self.data = individual # GA個体
         self.value = None      # 適応度 (デフォルトではシーケンス型, 先頭から優先的に参照される)
+        # self.id = type(self).current_id
+        # type(self).current_id += 1
 
     def __getitem__(self, key):
         return self.value[key]
@@ -210,7 +212,34 @@ class Fitness(object):
     #         self.problem = problem
     #         self.value = np.array(problem(self.get_variable()))
 
+
 class Couple(object):
     def __init__(self, data):
         self._data = data
         self._offspring = []
+
+
+class NoisingIndividual(Individual):
+    def evaluate(self, function):
+        res = super().evaluate(function)
+        self.wvalue_stored = self.wvalue
+        self.add_noise()
+        return res
+
+    def add_noise(self):
+        self.wvalue = self.wvalue_stored + np.random.uniform(-1e-5, 1e-5,
+                                                             size=len(self))
+
+    # def __le__(self, other):
+    #     self.wvalue = self.wvalue_stored + np.random.uniform(-1e-5, 1e-5,
+    #                                                          size=len(self))
+    #     return super().__le__(other)
+
+
+class NoisingFitness(Fitness):
+    def __init__(self, src):
+        self.__dict__.update(src.__dict__)
+
+    def dominates(self, other):
+        self.data.add_noise()
+        return super().dominates(other)

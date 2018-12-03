@@ -23,7 +23,10 @@ class Population(object):
         return len(self.data)
 
     def __add__(self, other):
-        return self.data + other.data
+        if isinstance(other, Population):
+            return self.data + other.data
+        elif iter(other):
+            return self.data + list(other)
 
     def append(self, x):
         self.data.append(x)

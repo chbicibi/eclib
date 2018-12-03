@@ -133,6 +133,8 @@ class NondominatedSortIterator(object):
 ################################################################################
 
 class CrowdingDistanceCalculator(object):
+    ''' key=attrgetter('data')
+    '''
     def __init__(self, key=identity):
         self.key = key
 

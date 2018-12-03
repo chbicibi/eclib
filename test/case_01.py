@@ -25,7 +25,7 @@ from eclib.operations import PolynomialMutation
 from eclib.optimizers import NSGA2
 from eclib.base import Individual
 
-import base_01 as base
+import base_0 as base
 import myutils as ut
 
 

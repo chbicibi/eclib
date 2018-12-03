@@ -25,7 +25,7 @@ from eclib.benchmarks import rosenbrock, zdt1, zdt2, zdt3, zdt4, zdt6
 from eclib.optimizers import MOEAD
 # from eclib.base import Individual
 
-import base_01 as base
+import base_0 as base
 import myutils as ut
 
 
@@ -37,7 +37,7 @@ def ga_main01(out='result', clear_directory=False):
     if clear_directory and os.path.isdir(out):
         shutil.rmtree(out)
 
-    problem = zdt6
+    problem = zdt1
     epoch = 250
     save_trigger = lambda i: i == epoch # 最後だけ
 
@@ -134,6 +134,7 @@ def ga_main1(out='result'):
 
     elite = optimizer.get_elite()
     print('elite:', len(elite))
+    imax = len(optimizer)
 
     for epoch, population in enumerate(optimizer):
         print(epoch, end='\n')
@@ -153,14 +154,12 @@ def ga_main1(out='result'):
         plt.scatter(x, y, label=f'{front[0][0]:.3f}')
 
         # plt.legend()
-        if epoch >= 10:
-            plt.show()
-            return
+        # if epoch >= 10:
+        #     plt.show()
+        #     return
 
-        if epoch < len(optimizer) - 1:
-            plt.pause(0.2)
-        else:
-            plt.show()
+        plt.pause(10/imax)
+    plt.show()
 
 
 def ga_main2(out='result'):
@@ -245,6 +244,7 @@ class TestClass(object):
         return super().__new__(cls)
 
     def __init__(self, *args):
+        self.args = args
         self.value0 = [1, 2, 3]
         self.value1 = [10, 20, 30]
         print('init', args)
@@ -254,6 +254,19 @@ class TestClass(object):
 
     def __iter__(self):
         return iter(self.value1)
+
+    def __getnewargs__(self):
+        return self.args
+
+    def __getstate__(self):
+        print('__getstate__')
+        print(self.__dict__)
+        return self.__dict__
+
+    def __setstate__(self, state):
+        print('__setstate__')
+        print(self.__dict__)
+        self.__dict__.update(state)
 
 
 class TestIterator(object):
@@ -272,8 +285,61 @@ class TestIterator(object):
             yield i
 
 
+class Testobj0:
+    param = 'abc'
+
+    def __init__(self, pool):
+        print('__init__')
+        self.pool = pool
+
+        self.id = len(pool)
+        pool.append(self)
+        self.data = np.random.random(10)
+        self.cls = type(self)
+
+        type(self).param = 'param' + str(self.id)
+
+    def __call__(self):
+        print(self.param)
+
+
 def __test__():
-    print(np.min([[0, 15], (5, 10)], axis=0))
+    # global Testobj
+    sys.setrecursionlimit(30)
+
+    file = 'pooltest5.pkl'
+    filecls = 'pooltest_cls.pkl'
+
+    cls = Testobj0
+
+    print(cls.param)
+
+    if os.path.isfile(file):
+        objs = ut.load(file)
+        cls = ut.load(filecls)
+        print(cls.param)
+
+    else:
+        pool = []
+        for i in range(1000):
+            obj = cls(pool)
+        objs = [x for x in pool]
+        ut.save(file, objs)
+        ut.save(filecls, cls)
+
+    print(len(objs))
+    obj = objs[500]
+
+    # print(pool[500], len(pool))
+    print(obj.id, obj.data)
+    obj()
+    print(cls.param)
+
+
+def __test__():
+    obj = TestClass('abc')
+    ut.save('test.pkl', obj)
+    obj = ut.load('test.pkl')
 
 
 def get_args():

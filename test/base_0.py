@@ -28,6 +28,7 @@ from eclib.operations import PolynomialMutation
 from eclib.optimizers import NSGA2
 from eclib.optimizers import MOEAD
 from eclib.base import Individual
+from eclib.base import NoisingIndividual
 
 import myutils as ut
 
@@ -71,7 +72,8 @@ class NSGA2_ENV(object):
         crossover = SimulatedBinaryCrossover(rate=0.9, eta=20)
         mutation = PolynomialMutation(rate=1/n_dim, eta=20)
 
-        optimizer = NSGA2(pop_size, selection, crossover, mutation)
+        optimizer = NSGA2(pop_size, selection, crossover, mutation,
+                          indiv_type=NoisingIndividual)
         # optimizer.set_initializer(Initializer(3))
         optimizer.setup(problem)
 
@@ -127,7 +129,7 @@ class MOEAD_ENV(object):
         ### Additional setting ###
         optimizer.initializer = initializer
         optimizer.n_cycle = None
-        # optimizer.alternation = 'replace'
+        optimizer.alternation = 'all'
         ##########################
 
         self.optimizer = optimizer

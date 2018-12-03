@@ -20,6 +20,7 @@
 import argparse
 import os
 import pickle
+import random
 import shutil
 from itertools import islice
 from operator import attrgetter, itemgetter
@@ -32,8 +33,27 @@ from ..base import NondominatedSortIterator
 from ..base import CrowdingDistanceCalculator
 # from ..operations import SelectionIterator
 # from ..operations import MatingIterator
-from .nsga2 import SelectionIterator
-from .nsga2 import MatingIterator
+from .iterators import SelectionIterator
+from .iterators import MatingIterator
+
+
+# デフォルト用
+from eclib.operations import UniformInitializer
+from eclib.operations import RandomSelection
+from eclib.operations import RouletteSelection
+from eclib.operations import TournamentSelection
+from eclib.operations import TournamentSelectionStrict
+from eclib.operations import TournamentSelectionDCD
+from eclib.operations import BlendCrossover
+from eclib.operations import SimulatedBinaryCrossover
+from eclib.operations import PolynomialMutation
+
+# default_selection = TournamentSelection(ksize=2)
+default_selection = TournamentSelectionStrict(ksize=2)
+# default_selection = TournamentSelectionDCD()
+# default_crossover = BlendCrossover(alpha=0.5)
+default_crossover = SimulatedBinaryCrossover(rate=0.9, eta=20)
+default_mutation = PolynomialMutation(rate=0.05, eta=20)
 
 
 def clip(x):
@@ -65,51 +85,72 @@ def scalar_boundaryintersection(indiv, weight, ref_point):
 class MOEAD(object):
     ''' MOEADモデル(2D)
     '''
-    def __init__(self, popsize, selection, crossover, mutation, ksize,
-                 indiv_type=Individual):
+    def __init__(self, popsize=None, problem=None, pool=None, ksize=3,
+                 scalar=scalar_chebyshev,
+                 selection=default_selection,
+                 crossover=default_crossover,
+                 mutation=default_mutation):
         self.popsize = popsize
         self.ksize = ksize
+        self.problem = problem
+
         self.nobj = 2
         # self.select = selection
         # self.mate = crossover
         # self.mutate = mutation
-        self.scalar = scalar_boundaryintersection
+        self.scalar = scalar
 
-        self.n_parents = 2        # 1回の交叉の親個体の数
-        self.n_cycle = 2          # 選択候補をリセットする周期(n_parentsの倍数にすること)
-        self.alternation = 'join' # 世代交代方法
+        self.n_parents = 2       # 1回の交叉の親個体の数
+        self.n_cycle = 2         # 選択候補をリセットする周期(n_parentsの倍数にすること)
+        self.alternation = 'new' # 世代交代方法
 
-        self.indiv_type = indiv_type # 個体の型
+        # self.indiv_type = indiv_type # 個体の型
         # self.pop_type = Population # 解集団の型
 
         # self.initializer = None
-        self.population = Population(capacity=popsize)
+        # self.population = Population(capacity=popsize)
         # self.next_population = Population(capacity=popsize)
 
-        self.select_it = SelectionIterator(selection=selection)
+        self.select_it = SelectionIterator(selection=selection, pool=pool)
         self.mate_it = MatingIterator(crossover=crossover,
                                       mutation=mutation,
-                                      indiv_type=indiv_type)
+                                      pool=pool)
         self.sort_it = NondominatedSortIterator
         self.share_fn = CrowdingDistanceCalculator(key=attrgetter('data')) # Fitness -> Individual
 
-        self.generation = 0
-        self.history = []
-        self.init_weight2d()
+        # self.generation = 0
+        # self.history = []
+        if not self.popsize:
+            self.init_weight2d()
 
-    def __getitem__(self, key):
-        return self.history[key]
+    def __call__(self, population):
+        if not self.popsize:
+            self.popsize = len(population)
+            self.init_weight2d()
 
-    def __len__(self):
-        return len(self.history)
+        next_population = self.advance(population)
+        return next_population
 
-    def setup(self, problem):
-        ''' 最適化問題を登録 '''
-        self.problem = problem
+    # def __getitem__(self, key):
+    #     return self.history[key]
 
-    def init_weight2d(self):
+    # def __len__(self):
+    #     return len(self.history)
+
+    # def setup(self, problem):
+    #     ''' 最適化問題を登録 '''
+    #     self.problem = problem
+
+    def init_weight2d(self, popsize=None, ksize=None):
         ''' 重みベクトルと近傍テーブルの初期化
         '''
+        if popsize:
+            self.popsize = popsize
+        if ksize:
+            self.ksize = ksize
+        if not self.popsize or not self.ksize:
+            return
+
         def get_neighbor(index):
             imin = min(max(index-(self.ksize-1)//2, 0),
                        self.popsize-self.ksize)
@@ -137,75 +178,75 @@ class MOEAD(object):
             raise
             exit()
 
-
-    def init_population(self, initializer=None):
+    def init_population(self, creator, popsize=None):
         ''' 初期集団生成
         '''
-        self.generation = 1
+        # self.generation = 1
 
-        if initializer:
-            self.initializer = initializer
-        if not self.initializer:
-            raise Exception('initializer in None')
+        # if initializer:
+        #     self.initializer = initializer
+        # if not self.initializer:
+        #     raise Exception('initializer in None')
 
-        while not self.population.filled():
-            indiv = self.indiv_type(self.initializer(), origin=self.initializer)
+        if popsize:
+            self.popsize = popsize
+            self.init_weight2d()
+
+        population = Population(capacity=self.popsize)
+
+        while not population.filled():
+            indiv = creator()
             fitness = indiv.evaluate(self.problem)
-            self.population.append(fitness)
+            population.append(fitness)
 
-        # self.calc_fitness(self.population)
-        self.ref_point = np.min([fit.data.wvalue for fit in self.population],
-                                axis=0)
-        self.history.append(self.population)
-        # print(self.ref_point)
-        # exit()
+        # self.calc_fitness(population)
+        self.ref_point = np.min([fit.data.wvalue for fit in population], axis=0)
+        return population
 
-    def advance(self):
+    def advance(self, population):
         ''' 選択→交叉→突然変異→評価→適応度計算→世代交代
         '''
-        self.generation += 1
+        # self.generation += 1
 
         next_population = Population(capacity=self.popsize)
         # select_it = self.select_it(self.population, reset_cycle=self.n_cycle)
         # select_it = iter(select_it) # Fixed
 
         for i in range(self.popsize):
-            subpopulation = [self.population[j] for j in self.table[i]]
-            child_fit = self.get_offspring(subpopulation, self.weight[i])
+            # subpopulation = [self.population[j] for j in self.table[i]]
+            child_fit = self.get_offspring(i, population, self.weight[i])
             next_population.append(child_fit)
 
-        self.population = next_population
-        self.history.append(self.population)
-        # exit()
-        return self.population
+        return next_population
 
-    def alternate(self, next_population):
-        raise
-        ''' 適応度計算 → 世代交代
-        1. 親世代を子世代で置き換える
-        2. 親世代と子世代の和からランクを求める
-        '''
-        if self.alternation == 'replace':
-            self.calc_fitness(next_population)
-            return next_population
+    # def alternate(self, next_population):
+    #     raise
+    #     ''' 適応度計算 → 世代交代
+    #     1. 親世代を子世代で置き換える
+    #     2. 親世代と子世代の和からランクを求める
+    #     '''
+    #     if self.alternation == 'replace':
+    #         self.calc_fitness(next_population)
+    #         return next_population
 
-        elif self.alternation == 'join':
-            joined = self.population + next_population
-            next_population = self.calc_fitness(joined, n=self.popsize)
-            # print([fit.data.id for fit in next_population])
-            # exit()
-            return Population(next_population, capacity=self.popsize)
+    #     elif self.alternation == 'join':
+    #         joined = self.population + next_population
+    #         next_population = self.calc_fitness(joined, n=self.popsize)
+    #         # print([fit.data.id for fit in next_population])
+    #         # exit()
+    #         return Population(next_population, capacity=self.popsize)
 
-        else:
-            print('Unexpected alternation type:', self.alternation)
-            raise Exception('UnexpectedAlternation')
+    #     else:
+    #         print('Unexpected alternation type:', self.alternation)
+    #         raise Exception('UnexpectedAlternation')
 
-    def get_offspring(self, subpopulation, weight):
+    def get_offspring(self, index, population, weight):
         ''' 各個体の集団内における適応度を計算する
         1. スカラー化関数
         交叉，突然変異を行い最良個体を1つ返す
+        * 2018.11.21 新しい解が古い解より良い場合に置き換える処理に変更
         '''
-        # subpopulation = [population(i) for i in self.table[index]]
+        subpopulation = [population[i] for i in self.table[index]]
         # weight = self.weight[index]
 
         for i, fit in enumerate(subpopulation):
@@ -215,17 +256,23 @@ class MOEAD(object):
         select_it = self.select_it(subpopulation, reset_cycle=self.n_cycle)
         paretns = list(islice(select_it, self.n_parents))
 
-        for child in self.mate_it(paretns):
-            child_fit = child.evaluate(self.problem)
-            self.update_reference(child)
-            fit_value = self.scalar(child_fit.data, weight, self.ref_point)
-            child_fit.set_fitness((fit_value,), 1)
-            subpopulation.append(child_fit)
+        # offspring = []
 
-        # print([fit.value for fit in subpopulation])
-        # exit()
+        child = random.choice(list(self.mate_it(paretns)))
+        # for child in self.mate_it(paretns):
+        child_fit = child.evaluate(self.problem)
+        self.update_reference(child)
+        fit_value = self.scalar(child_fit.data, weight, self.ref_point)
+        child_fit.set_fitness((fit_value,), 1)
+        # offspring.append(child_fit)
 
-        return max(subpopulation)
+        if self.alternation == 'new':
+            return max(population[index], child_fit)
+        elif self.alternation == 'all':
+            return max(*subpopulation, child_fit)
+        else:
+            print('Unexpected alternation type:', self.alternation)
+            raise Exception('UnexpectedAlternation')
 
 
     def get_individuals(self):
@@ -235,6 +282,16 @@ class MOEAD(object):
 
     def get_elite(self):
         return [x for x in self.population if x.rank == 1]
+
+    def calc_rank(self, population, n=None):
+        ''' 各個体の集団内におけるランクを計算して設定する
+        外部から呼ぶ
+        '''
+        for i, front in enumerate(self.sort_it(population)):
+            rank = i + 1
+            for fit in front:
+                fit.rank = rank
+        return population
 
     def clear(self):
         self.Population = Population(capacity=self.popsize)
@@ -255,7 +312,7 @@ class MOEAD(object):
                 return pickle.load(f)
 
         except FileNotFoundError:
-            print('NSGA2.load: File is not found')
+            print('MOEAD.load: File is not found')
             raise
 
 

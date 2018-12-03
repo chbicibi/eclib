@@ -17,10 +17,11 @@ class BlendCrossover(object):
         self.alpha = alpha
         self.oneout = oneout
 
-    def __call__(self, origin):
+    def __call__(self, genes):
         # x1 = origin[0].get_gene()
         # x2 = origin[1].get_gene()
-        x1, x2 = (x.get_gene('d') for x in origin[:2])
+        # x1, x2 = (x.get_gene('d') for x in origin[:2])
+        x1, x2 = genes
 
         if random.random() > self.rate:
             return x1, x2
@@ -42,11 +43,12 @@ class SimulatedBinaryCrossover(object):
         self.eta = eta
         self.oneout = oneout
 
-    def __call__(self, origin):
+    def __call__(self, genes):
         # x1 = origin[0].get_gene()
         # x2 = origin[1].get_gene()
 
-        y1, y2 = (np.array(x.get_gene('d')) for x in origin[:2])
+        # y1, y2 = (np.array(x.get_gene('d')) for x in origin[:2])
+        y1, y2 = map(np.array, genes)
 
         if random.random() > self.rate:
             return y1, y2
@@ -131,8 +133,9 @@ class OrderCrossover(object):
         self.rate = rate
         self.f_ = f_
 
-    def __call__(self, origin):
-        x1, x2 = (x.get_gene('i') for x in origin[:2])
+    def __call__(self, genes):
+        # x1, x2 = (x.get_gene('i') for x in origin[:2])
+        x1, x2 = genes
         if random.random() > self.rate:
             return x1, x2
         return self.f_(x1, x2)

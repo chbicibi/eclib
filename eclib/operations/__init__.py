@@ -9,5 +9,3 @@ from .crossover import SimulatedBinaryCrossover
 from .crossover import OrderCrossover
 from .mutation import PolynomialMutation
 from .mutation import SwapMutation
-from ..optimizers.nsga2 import SelectionIterator
-from ..optimizers.nsga2 import MatingIterator
