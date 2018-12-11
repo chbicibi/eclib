@@ -1,30 +1,3 @@
-'''
-'''
-
-# import argparse
-# import os
-# import pickle
-# import shutil
-# from itertools import islice
-# from operator import attrgetter, itemgetter
-
-# import numpy as np
-
-# from ..base import Individual
-# from ..base import Population
-# from ..base import NondominatedSortIterator
-# from ..base import CrowdingDistanceCalculator
-
-
-class InitialCreationIterator(object):
-    ''' 初期個体を生成するイテレータ
-    '''
-    def __init__(self, initializer):
-        pass
-
-
-################################################################################
-
 class PartialSelectionIterator(object):
     ''' SelectionIteratorの部分適用オブジェクト
     '''

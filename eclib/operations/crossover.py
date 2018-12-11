@@ -4,7 +4,7 @@ import random
 import numpy as np
 
 
-LOADER_PATH = os.path.abspath(os.path.join(__file__, '../../../lib'))
+LOADER_PATH = os.path.abspath(os.path.join(__file__, '../../../fortran'))
 
 
 ################################################################################

@@ -3,8 +3,10 @@ FCFLAGS = -O2 -Wall -Wno-unused-dummy-argument -Wno-unused-function -ffree-line-
 # FCFLAGS = -O2 -ffpe-trap=invalid,zero,overflow -fbacktrace -g
 # FCFLAGS = -fopenmp -static-libgfortran -static-libgcc
 
-DEST_LIB = ../lib
-DEST_INC = ../include
+DEST_LIB = .
+DEST_INC = .
+# DEST_LIB = ../lib
+# DEST_INC = ../include
 
 TARLIBD = libfec.dll
 TARLIBS = libfec.a

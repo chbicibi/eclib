@@ -9,22 +9,10 @@ def identity(x):
 
 
 class NondominatedSort(object):
-    '''
-    def cmp(a, b):
-        if a == b: return 0
-        return -1 if a < b else 1
-    '''
     def __init__(self, size=100):
         self.size = size
 
-        # self.is_dominated = np.empty((size, size), dtype=np.bool)
-        # self.num_dominated = np.empty(size, dtype=np.uint32)
-        # self.mask = np.empty(size, dtype=np.bool)
-        # self.rank = np.empty(size, dtype=np.uint32)
-
     def __call__(self, population, n=None, return_rank=False):
-        # return sortNondominated_v1(population, n=n)
-
         popsize = len(population)
         if not popsize:
             Exception('Error: population size is 0')
@@ -67,22 +55,12 @@ class NondominatedSort(object):
                 return fronts
 
             # 優越数更新
-            # for i in range(popsize):
-            #     num_dominated[i] -= np.sum(mask * is_dominated[i, :])
-            # print(mask.dtype)
-            # print(is_dominated.dtype)
-            # print((mask & is_dominated).sum(axis=(1,)))
             num_dominated -= np.sum(mask & is_dominated, axis=(1,))
 
         raise Exception('Error: reached the end of function')
 
 
 class NondominatedSortIterator(object):
-    '''
-    def cmp(a, b):
-        if a == b: return 0
-        return -1 if a < b else 1
-    '''
     def __init__(self, population):
         self._population = population
         self._size = len(population)
@@ -169,62 +147,3 @@ class CrowdingDistanceCalculator(object):
                 distances[c] += (get_value(r) - get_value(l)) / norm
 
         return distances
-
-
-################################################################################
-
-from collections import defaultdict
-
-
-def sortNondominated_v1(population, n=None, first_front_only=False):
-    k = len(population) if n is None else n
-    if k == 0:
-        return []
-
-    map_fit_ind = defaultdict(list)
-    for fit in population:
-        map_fit_ind[fit.data.value].append(fit)
-    fits = list(map_fit_ind.keys())
-
-    current_front = []
-    next_front = []
-    dominating_fits = defaultdict(int)
-    dominated_fits = defaultdict(list)
-
-    def dominates(fit0, fit1):
-        return map_fit_ind[fit0][0].dominates(map_fit_ind[fit1][0])
-
-    # Rank first Pareto front
-    for i, fit_i in enumerate(fits):
-        for fit_j in fits[i+1:]:
-            if dominates(fit_i, fit_j):
-                dominating_fits[fit_j] += 1
-                dominated_fits[fit_i].append(fit_j)
-            elif dominates(fit_j, fit_i):
-                dominating_fits[fit_i] += 1
-                dominated_fits[fit_j].append(fit_i)
-        if dominating_fits[fit_i] == 0:
-            current_front.append(fit_i)
-
-    fronts = [[]]
-    for fit in current_front:
-        fronts[-1].extend(map_fit_ind[fit])
-    pareto_sorted = len(fronts[-1])
-
-    # Rank the next front until all population are sorted or
-    # the given number of individual are sorted.
-    if not first_front_only:
-        N = min(len(population), k)
-        while pareto_sorted < N:
-            fronts.append([])
-            for fit_p in current_front:
-                for fit_d in dominated_fits[fit_p]:
-                    dominating_fits[fit_d] -= 1
-                    if dominating_fits[fit_d] == 0:
-                        next_front.append(fit_d)
-                        pareto_sorted += len(map_fit_ind[fit_d])
-                        fronts[-1].extend(map_fit_ind[fit_d])
-            current_front = next_front
-            next_front = []
-
-    return fronts

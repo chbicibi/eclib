@@ -1,11 +1,5 @@
-# import random
 from functools import total_ordering
 import numpy as np
-# from .collections import Container
-
-
-class IndividualNotEvaluated(Exception):
-    pass
 
 
 ################################################################################
@@ -21,8 +15,6 @@ class Individual(object):
     ''' 進化計算個体
     遺伝子と評価値を管理する
     '''
-    # current_id = 0
-    # pool = []
     bounds = None # None or (low, up) or ([low], [up])
     weight = None # 重み(正=>最小化, 負=>最大化)
 
@@ -31,12 +23,6 @@ class Individual(object):
         self.origin = origin # 派生元 (初期化関数又は関数と引数の組)
         self.value = None    # 評価値 (デフォルトではシーケンス型)
         self.wvalue = None   # 重み付き評価値
-
-        # self.id = Individual.current_id
-        # Individual.current_id += 1
-        # self.id = len(type(self).pool)
-        # type(self).current_id = self.id + 1
-        # type(self).pool.append(self)
 
     def __getitem__(self, key):
         if self.value is None:
@@ -137,21 +123,14 @@ class Individual(object):
     def set_weight(cls, weight):
         cls.weight = np.array(weight)
 
-    @classmethod
-    def clear(cls):
-        cls.pool = []
-
 
 @total_ordering
 class Fitness(object):
     ''' 適応度
     '''
-    # current_id = 0
     def __init__(self, individual):
         self.data = individual # GA個体
         self.value = None      # 適応度 (デフォルトではシーケンス型, 先頭から優先的に参照される)
-        # self.id = type(self).current_id
-        # type(self).current_id += 1
 
     def __getitem__(self, key):
         return self.value[key]
@@ -191,33 +170,10 @@ class Fitness(object):
     def get_indiv(self):
         return self.data
 
-    # def get_gene(self):
-    #     ''' getter of genotype '''
-    #     return self.gene
 
-    # def get_variable(self):
-    #     ''' getter of phenotype '''
-    #     return self.decode(self.gene)
-
-    # def encode(self, x):
-    #     ''' phenotype -> genotype '''
-    #     return x
-
-    # def decode(self, x):
-    #     ''' genotype -> phenotype '''
-    #     return x
-
-    # def evaluate(self, problem):
-    #     if not self.value:
-    #         self.problem = problem
-    #         self.value = np.array(problem(self.get_variable()))
-
-
-class Couple(object):
-    def __init__(self, data):
-        self._data = data
-        self._offspring = []
-
+################################################################################
+''' 個体間の優劣比較時に評価値にランダムで小さな値を付加する
+'''
 
 class NoisingIndividual(Individual):
     def evaluate(self, function):
@@ -229,11 +185,6 @@ class NoisingIndividual(Individual):
     def add_noise(self):
         self.wvalue = self.wvalue_stored + np.random.uniform(-1e-5, 1e-5,
                                                              size=len(self))
-
-    # def __le__(self, other):
-    #     self.wvalue = self.wvalue_stored + np.random.uniform(-1e-5, 1e-5,
-    #                                                          size=len(self))
-    #     return super().__le__(other)
 
 
 class NoisingFitness(Fitness):
