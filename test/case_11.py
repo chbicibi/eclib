@@ -132,7 +132,7 @@ def main1(out='result', force=False, clear_directory=False):
                 history.append(population)
 
                 if i % 50 == 50-1:
-                    ut.save(f'temp{i}.pkl', history)
+                    ut.save(f'result/temp{i}.pkl', history)
 
             plt.show()
             return env, optimizer, history
