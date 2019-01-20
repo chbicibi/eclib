@@ -8,7 +8,6 @@ class PolynomialMutation():
         self.eta = eta
 
     def __call__(self, gene):
-        size = len(gene)
         res = np.array(gene)
         xl, xu = 0.0, 1.0
 

@@ -106,32 +106,36 @@ class SimulatedBinaryCrossover(object):
 
 class OrderCrossover(object):
     def __init__(self, rate=0.9):
-        libname = 'libec.dll'
-        loader_path = LOADER_PATH
-        cdll = np.ctypeslib.load_library(libname, loader_path)
+        try:
+            libname = 'libec.dll'
+            loader_path = LOADER_PATH
+            cdll = np.ctypeslib.load_library(libname, loader_path)
 
-        func_ptr = getattr(cdll, 'order_crossover')
-        func_ptr.argtypes = [
-            np.ctypeslib.ndpointer(dtype=np.int32),
-            np.ctypeslib.ndpointer(dtype=np.int32),
-            ctypes.c_int32,
-            np.ctypeslib.ndpointer(dtype=np.int32),
-            np.ctypeslib.ndpointer(dtype=np.int32),
-        ]
-        func_ptr.restype = ctypes.c_void_p
+            func_ptr = getattr(cdll, 'order_crossover')
+            func_ptr.argtypes = [
+                np.ctypeslib.ndpointer(dtype=np.int32),
+                np.ctypeslib.ndpointer(dtype=np.int32),
+                ctypes.c_int32,
+                np.ctypeslib.ndpointer(dtype=np.int32),
+                np.ctypeslib.ndpointer(dtype=np.int32),
+            ]
+            func_ptr.restype = ctypes.c_void_p
 
-        def f_(x1, x2):
-            try:
-                n1 = ctypes.c_int32(x1.size)
-                y1, y2 = (np.empty_like(x) for x in (x1, x2))
-                func_ptr(x1, x2, n1, y1, y2)
-                return y1, y2
-            except:
-                print(x1, x2)
-                raise
+            def f_(x1, x2):
+                try:
+                    n1 = ctypes.c_int32(x1.size)
+                    y1, y2 = (np.empty_like(x) for x in (x1, x2))
+                    func_ptr(x1, x2, n1, y1, y2)
+                    return y1, y2
+                except:
+                    print(x1, x2)
+                    raise
 
-        self.rate = rate
-        self.f_ = f_
+            self.rate = rate
+            self.f_ = f_
+        except:
+            print('Error: OrderCrossover (ignore)')
+            pass
 
     def __call__(self, genes):
         # x1, x2 = (x.get_gene('i') for x in origin[:2])
