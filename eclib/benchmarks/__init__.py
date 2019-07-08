@@ -4,3 +4,4 @@ from .testfunctions import zdt2
 from .testfunctions import zdt3
 from .testfunctions import zdt4
 from .testfunctions import zdt6
+from .testfunctions import osy

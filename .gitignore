@@ -1,10 +1,7 @@
-*.exe
-*.o
-*.mod
-*.smod
-*.csv
-*.plt
-*.png
-__*__/
-config/
-result/
+*
+!*/
+!.gitignore
+!Makefile
+!*.f08
+!*.md
+!*.py

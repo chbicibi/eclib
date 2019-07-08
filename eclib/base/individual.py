@@ -1,4 +1,5 @@
 from functools import total_ordering
+from .problem import Problem, ConstraintProblem
 import numpy as np
 
 
@@ -23,6 +24,7 @@ class Individual(object):
         self.origin = origin # 派生元 (初期化関数又は関数と引数の組)
         self.value = None    # 評価値 (デフォルトではシーケンス型)
         self.wvalue = None   # 重み付き評価値
+        self.const = None    # 制約条件
 
     def __getitem__(self, key):
         if self.value is None:
@@ -76,7 +78,15 @@ class Individual(object):
     def evaluate(self, function):
         if not self.evaluated():
             self.function = function
-            self.value = function(self.get_variable())
+
+            # 評価
+            if isinstance(function, ConstraintProblem):
+                res = function(self.get_variable())
+                self.value = res[0]
+                self.const = res[1]
+            else:
+                self.value = function(self.get_variable())
+
             if self.weight is not None:
                 self.wvalue = self.weight * self.value
             else:

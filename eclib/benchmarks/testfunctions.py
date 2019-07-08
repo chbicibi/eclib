@@ -86,11 +86,13 @@ def zdt6(x):
 ################################################################################
 
 def osy(x):
+    assert(len(x) == 6)
+
     if len(x) == 1:
         return x[0], 1 - math.sqrt(x[0])
 
     f1 = sum(map(lambda i, v: (-1 if i else -25) * (x[i] - v) ** 2,
-                             enumerate([2, 2, 1, 4, 1])))
+                             range(5), [2, 2, 1, 4, 1]))
     f2 = sum(map(lambda v: v ** 2, x))
     g1 = x[0] + x[1] - 2
     g2 = 6 - x[0] - x[1]
